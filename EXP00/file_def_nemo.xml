@@ -33,19 +33,23 @@
 	  <field field_ref="mldr10_1"     name="mldr10_1"  />
           <field field_ref="ke"           name="ke"      />
           <field field_ref="ke_zint"      name="ke_zint" />
-          <field_group group_ref="trendT"  />
+          <field field_ref="sgske"   />
+          <field field_ref="sgske_zint" />
+
+          <field field_ref="ahmt_2d" />
+          <field field_ref="ahmt_3d" />
+          <field field_ref="bhmt_2d" />
+          <field field_ref="bhmt_3d" />
         </file>
 	
         <file id="file2" name_suffix="_grid_U" description="ocean U grid variables" >
           <field field_ref="uoce"         name="uoce"  />
           <field field_ref="utau"         name="utau"  />
-          <field_group group_ref="trendU"  />
         </file>
 	
         <file id="file3" name_suffix="_grid_V" description="ocean V grid variables" >
           <field field_ref="voce"         name="voce"  /> 
           <field field_ref="vtau"         name="vtau"  /> 
-          <field_group group_ref="trendV"  />
         </file>
 	
         <file id="file4" name_suffix="_grid_W" description="ocean W grid variables" >
@@ -64,7 +68,19 @@
       <file_group id="3m" output_freq="3mo" output_level="10" enabled=".TRUE."/> <!-- real 3m files -->
       <file_group id="4m" output_freq="4mo" output_level="10" enabled=".TRUE."/> <!-- real 4m files -->
       <file_group id="6m" output_freq="6mo" output_level="10" enabled=".TRUE."/> <!-- real 6m files -->
-      <file_group id="1y"  output_freq="1y" output_level="10" enabled=".TRUE."/> <!-- real yearly files -->
+      
+      <file_group id="1y"  output_freq="1y" output_level="10" enabled=".TRUE."> <!-- real yearly files -->
+         <file id="file6" name_suffix="_grid_T" description="ocean T grid variables" >
+            <field_group group_ref="trendT"  />
+         </file>
+         <file id="file7" name_suffix="_grid_U" description="ocean U grid variables" >
+            <field_group group_ref="trendU"  />
+         </file>
+         <file id="file8" name_suffix="_grid_V" description="ocean V grid variables" >
+            <field_group group_ref="trendV"  />
+         </file>
+      </file_group>
+      
       <file_group id="2y"  output_freq="2y" output_level="10" enabled=".TRUE."/> <!-- real 2y files -->
       <file_group id="5y"  output_freq="5y" output_level="10" enabled=".TRUE."/> <!-- real 5y files -->
       <file_group id="10y" output_freq="10y" output_level="10" enabled=".TRUE."/> <!-- real 10y files -->

@@ -55,6 +55,8 @@ MODULE ldfdyn
    !                                        ! KE backscatter
    REAL(wp), PUBLIC ::   rn_ckeb = 0.1
    REAL(wp), PUBLIC ::   rn_bhm_0 = -1000._wp ! limiter for backsc visc 
+   INTEGER , PUBLIC ::   nn_keb_pass = 4      ! number of filtering passes for KEB tendency
+   INTEGER , PUBLIC ::   nn_sgs_pass = 2      ! number of filtering passes for SGS KE
 
    !                                    !!* Parameter to control the type of lateral viscous operator
    INTEGER, PARAMETER, PUBLIC ::   np_ERROR  =-10                       !: error in setting the operator
@@ -119,7 +121,7 @@ CONTAINS
          &                 ln_dynldf_lev, ln_dynldf_hor, ln_dynldf_iso,   &   ! acting direction of the operator
          &                 nn_ahm_ijk_t , rn_Uv    , rn_Lv,   rn_ahm_b,   &   ! lateral eddy coefficient
          &                 rn_csmc      , rn_minfac    , rn_maxfac,       &   ! Smagorinsky settings
-         &                 ln_sgske     , ln_kebs  , rn_ckeb, rn_bhm_0        ! SGS KE (Joakim)
+         &                 ln_sgske     , ln_kebs  , rn_ckeb, rn_bhm_0, nn_keb_pass, nn_sgs_pass  ! SGS KE (Joakim)
       !!----------------------------------------------------------------------
       !
       REWIND( numnam_ref )              ! Namelist namdyn_ldf in reference namelist : Lateral physics
@@ -161,8 +163,12 @@ CONTAINS
          !
 	 WRITE(numout,*) '      Sub-grid scale kinetic energy : '
          WRITE(numout,*) '         reservoir                             ln_sgske = ', ln_sgske 
-         WRITE(numout,*) '         backscatter                           ln_kebs  = ', ln_kebs
+         WRITE(numout,*) '         sgs ke filtering passes               nn_sgs_pass = ', nn_sgs_pass
+         !
+         WRITE(numout,*) '      KE backscatter                           ln_kebs  = ', ln_kebs
          WRITE(numout,*) '         backscatter coeff. (non-dim)          rn_ckeb  = ', rn_ckeb
+         WRITE(numout,*) '         backscatter visc. limiter m2/s        rn_bhm_0 = ', rn_bhm_0
+         WRITE(numout,*) '         backscatter filtering passes          nn_keb_pass = ', nn_keb_pass
       ENDIF
 
       !

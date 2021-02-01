@@ -68,6 +68,9 @@ CONTAINS
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::   bu, bv   ! volume of u- and v-boxes
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::   r1_bt    ! inverse of t-box volume
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::   zke      ! temporary KE array
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:)   ::   zsgs1
+      REAL(wp)                                ::   rn_wgt, rn_wgt_n, rn_wgt_c, rn_wgt_n1, rn_wgt_n2
+      INTEGER                                 ::   jp
       !!----------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('dyn_ldf')
@@ -84,7 +87,7 @@ CONTAINS
          ztrdu(:,:,:) = ua(:,:,:) 
          ztrdv(:,:,:) = va(:,:,:) 
          IF ( ln_sgske ) THEN
-            ALLOCATE( bu(jpi,jpj,jpk), bv(jpi,jpj,jpk), r1_bt(jpi,jpj,jpk), zke(jpi,jpj,jpk) )    ! inverse of t-box volume
+            ALLOCATE( bu(jpi,jpj,jpk), bv(jpi,jpj,jpk), r1_bt(jpi,jpj,jpk), zke(jpi,jpj,jpk), zsgs1(jpi,jpj) )    ! inverse of t-box volume
          END IF
       ENDIF
       !
@@ -136,7 +139,7 @@ CONTAINS
                ztrdu(:,:,:) = ua(:,:,:) 
                ztrdv(:,:,:) = va(:,:,:) 
                !
-               CALL dyn_ldf_keb( kt, ub, vb, ua, va, 4 ) ! KE backscatter
+               CALL dyn_ldf_keb( kt, ub, vb, ua, va, nn_keb_pass ) ! KE backscatter
                !               
 !!jk: this is the contribution from backscatter
                ztrdu(:,:,:) = ua(:,:,:) - ztrdu(:,:,:)
@@ -175,13 +178,54 @@ CONTAINS
 !!jk: Again multiply by rn_rdt
                sgs_ke(:,:,:) = sgs_ke(:,:,:) - zke(:,:,:) * rn_rdt
                CALL lbc_lnk_multi( 'dynldf', sgs_ke, 'T', -1.)
-            ENDIF
-	    !  
+               IF ( nn_sgs_pass > 0 ) THEN
+                   DO jp = 1, nn_sgs_pass
+                      !
+                      !rn_wgt_c = 1._wp
+                      !rn_wgt_n = 1._wp
+                      !rn_wgt   = 1._wp / ( 4._wp * rn_wgt_n + rn_wgt_c )
+                      !
+                      !sgs_ke(2:jpim1, 2:jpjm1, 1:jpkm1) = rn_wgt * ( rn_wgt_n * sgs_ke(2:jpim1,   1:jpjm1-1, 1:jpkm1) &
+                      !                                             + rn_wgt_n * sgs_ke(2:jpim1,   3:jpj,     1:jpkm1) &
+                      !                                             + rn_wgt_n * sgs_ke(1:jpim1-1, 2:jpjm1,   1:jpkm1) &
+                      !                                             + rn_wgt_n * sgs_ke(3:jpi,     2:jpjm1,   1:jpkm1) &
+                      !                                             + rn_wgt_c * sgs_ke(2:jpim1,   2:jpjm1,   1:jpkm1) )
+                      !
+                      DO jk = 1, jpkm1
+                         !!jk: interpolate u to v point (and back)
+                         !!jk: and v to u point (and back)
+                         zsgs1(:,:) = 0._wp
+                         !
+                         DO jj = 2,jpjm1
+                            DO ji = fs_2, fs_jpim1
+                            !
+                            rn_wgt = 1._wp / 16._wp
+                            rn_wgt_c = 4._wp
+                            rn_wgt_n1 = 2._wp
+                            rn_wgt_n2 = 1._wp
+                            !
+                            zsgs1(ji,jj) = rn_wgt * ( rn_wgt_c  * sgs_ke(ji, jj, jk) + &
+                                                    & rn_wgt_n1 * (sgs_ke(ji, jj+1, jk) + sgs_ke(ji-1, jj, jk) + sgs_ke(ji+1, jj, jk) + sgs_ke(ji,jj-1,jk)) + &
+                                                    & rn_wgt_n2 * (sgs_ke(ji-1,jj+1,jk) + sgs_ke(ji+1,jj+1,jk) + sgs_ke(ji+1,jj-1,jk) + sgs_ke(ji-1,jj-1,jk)) )
+                            !
+                            !
+                            END DO
+                         END DO
+                         !
+                         sgs_ke(:,:,jk) = zsgs1(:,:)
+                         !
+                      END DO
+                      !
+                      CALL lbc_lnk_multi( 'dynldf', sgs_ke, 'T', -1.)
+                      !
+                   END DO
+               ENDIF
+	       !  
+            END IF
          END IF
-         !IF ( l_trddyn ) THEN
-         !   CALL trd_dyn( ztrdu, ztrdv, jpdyn_ldf, kt )
-         !END IF
+         !
          DEALLOCATE ( ztrdu , ztrdv )         
+         !
       ENDIF
       !                                          ! print sum trends (used for debugging)
       IF(ln_ctl)   CALL prt_ctl( tab3d_1=ua, clinfo1=' ldf  - Ua: ', mask1=umask,   &

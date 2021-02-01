@@ -48,12 +48,13 @@ CONTAINS
       INTEGER                         , INTENT(in   ) ::   kpass      ! number of times we smooth
       REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(in   ) ::   pub, pvb   ! before velocity   [m/s]
       REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pua, pva   ! velocity trend    [m/s2]
-      REAL(wp), DIMENSION(jpi,jpj,jpk)                ::   zua, zva   
+      REAL(wp), DIMENSION(jpi,jpj,jpk)                ::   zua, zva
+      REAL(wp), DIMENSION(jpi,jpj)                    ::   zua1, zva1 ! temporary   
       !
       INTEGER  ::   ji, jj, jk,jp ! dummy loop indices
       REAL(wp) ::   zsign        ! local scalars
       REAL(wp), DIMENSION(jpi,jpj) ::   zcur, zdiv
-      REAL(wp) ::   rn_wgt, rn_wgt_c, rn_wgt_n ! local weights 
+      REAL(wp) ::   rn_wgt, rn_wgt_c, rn_wgt_n, rn_wgt_n1, rn_wgt_n2 ! local weights 
       !!----------------------------------------------------------------------
       !
       IF( kt == nit000 .AND. lwp ) THEN
@@ -118,38 +119,56 @@ CONTAINS
 !!jk: this needs to be energy conservative      
       IF ( kpass > 0 ) THEN
          DO jp = 1, kpass 
+            
+            !!jk: this is a 4-point filter 
+            !rn_wgt_c = 1._wp
+            !rn_wgt_n = 1._wp
+            !rn_wgt   = 1._wp / ( 4._wp * rn_wgt_n + rn_wgt_c )
             !
-            rn_wgt_c = 1._wp
-            rn_wgt_n = 1._wp
-            rn_wgt   = 1._wp / ( 4._wp * rn_wgt_n + rn_wgt_c )
+            !zua(2:jpim1, 2:jpjm1, 1:jpkm1) = rn_wgt * ( rn_wgt_n * zua(2:jpim1,   1:jpjm1-1, 1:jpkm1) & 
+            !                                          + rn_wgt_n * zua(2:jpim1,   3:jpj,     1:jpkm1) & 
+            !                                          + rn_wgt_n * zua(1:jpim1-1, 2:jpjm1,   1:jpkm1) & 
+            !                                          + rn_wgt_n * zua(3:jpi,     2:jpjm1,   1:jpkm1) & 
+            !                                          + rn_wgt_c * zua(2:jpim1,   2:jpjm1,   1:jpkm1) )
             !
-            zua(2:jpim1, 2:jpjm1, 1:jpkm1) = rn_wgt * ( rn_wgt_n * zua(2:jpim1,   1:jpjm1-1, 1:jpkm1) & 
-                                                      + rn_wgt_n * zua(2:jpim1,   3:jpj,     1:jpkm1) & 
-                                                      + rn_wgt_n * zua(1:jpim1-1, 2:jpjm1,   1:jpkm1) & 
-                                                      + rn_wgt_n * zua(3:jpi,     2:jpjm1,   1:jpkm1) & 
-                                                      + rn_wgt_c * zua(2:jpim1,   2:jpjm1,   1:jpkm1) )
+            !zva(2:jpim1, 2:jpjm1, 1:jpkm1) = rn_wgt * ( rn_wgt_n * zva(2:jpim1,   1:jpjm1-1, 1:jpkm1) &
+            !                                          + rn_wgt_n * zva(2:jpim1,   3:jpj,     1:jpkm1) &
+            !                                          + rn_wgt_n * zva(1:jpim1-1, 2:jpjm1,   1:jpkm1) & 
+            !                                          + rn_wgt_n * zva(3:jpi,     2:jpjm1,   1:jpkm1) & 
+            !                                          + rn_wgt_c * zva(2:jpim1,   2:jpjm1,   1:jpkm1) ) 
             !
-            zva(2:jpim1, 2:jpjm1, 1:jpkm1) = rn_wgt * ( rn_wgt_n * zva(2:jpim1,   1:jpjm1-1, 1:jpkm1) &
-                                                      + rn_wgt_n * zva(2:jpim1,   3:jpj,     1:jpkm1) &
-                                                      + rn_wgt_n * zva(1:jpim1-1, 2:jpjm1,   1:jpkm1) & 
-                                                      + rn_wgt_n * zva(3:jpi,     2:jpjm1,   1:jpkm1) & 
-                                                      + rn_wgt_c * zva(2:jpim1,   2:jpjm1,   1:jpkm1) ) 
-            !
-            DO jk = 1, jpkm1 
-               DO jj = 2, jpj
-                  DO ji = fs_2, jpi
-                     !IF ( abs(zua(ji,jj,jk)) > 1e-3 .or. isnan(zua(ji,jj,jk)) ) THEN
-                     !    PRINT*," JTK: zua, pass: ",zua(ji,jj,jk), jp
-                     !ENDIF
-                     !IF ( abs(zva(ji,jj,jk)) > 1e-3 .or. isnan(zva(ji,jj,jk)) ) THEN
-                     !    PRINT*," JTK: zva, pass: ",zva(ji,jj,jk), jp
-                     !ENDIF
+            DO jk = 1, jpkm1
+               !!jk: interpolate u to v point (and back)
+               !!jk: and v to u point (and back)
+               zua1(:,:) = 0._wp
+               zva1(:,:) = 0._wp
+               !
+               DO jj = 2,jpjm1    
+                  DO ji = fs_2, fs_jpim1
+                     !
+                     rn_wgt = 1._wp / 16._wp
+                     rn_wgt_c = 4._wp
+                     rn_wgt_n1 = 2._wp
+                     rn_wgt_n2 = 1._wp
+                     ! 
+                     zua1(ji,jj) = rn_wgt * ( rn_wgt_c  * zua(ji, jj, jk) + &
+                                            & rn_wgt_n1 * (zua(ji, jj+1, jk) + zua(ji-1, jj, jk) + zua(ji+1, jj, jk) + zua(ji,jj-1,jk)) + &
+                                            & rn_wgt_n2 * (zua(ji-1,jj+1,jk) + zua(ji+1,jj+1,jk) + zua(ji+1,jj-1,jk) + zua(ji-1,jj-1,jk)) )
+                     !
+                     zva1(ji,jj) = rn_wgt * ( rn_wgt_c  * zva(ji, jj, jk) + & 
+                                            & rn_wgt_n1 * (zva(ji+1, jj, jk) + zva(ji, jj-1, jk) + zva(ji-1, jj, jk) + zva(ji,jj+1,jk)) + &
+                                            & rn_wgt_n2 * (zva(ji+1,jj-1,jk) + zva(ji+1,jj+1,jk) + zva(ji-1,jj+1,jk) + zva(ji-1,jj-1,jk)) )
+                     !
                   END DO
                END DO
+               !
+               zua(:,:,jk) = zua1(:,:)
+               zva(:,:,jk) = zva1(:,:)           
+               !
             END DO
-            !
             !jk: not sure about north fold sign
-            CALL lbc_lnk_multi( 'dynldf_keb', zua, 'U', -1.,  zva, 'V', -1. )
+            CALL lbc_lnk_multi( 'dynldf_keb', zua1, 'U', -1.,  zva1, 'V', -1. )
+            !            
          END DO
          !      
       ENDIF
